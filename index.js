@@ -3,15 +3,8 @@ var fs = require('fs');
 var socketServer = require('./socket_server');
 
 var accts = JSON.parse(fs.readFileSync('accounts.json'));
+var rooms = JSON.parse(fs.readFileSync('rooms.json'));
 var clients = [];
-var topics = [];
-
-topics.push({
-  id: 'DEADBEEF',
-  name: 'Programming',
-  format: 'markdown',
-  acl: [['dan', ['owner']], ['Squidward', ['ban']]],
-  description: '## Programming talk\n* RCMP post-commit-hook: http://rcmp.tenthbit.net/\n* Get permission before sharing logs, or any paraphrasing thereof, from here.'});
 
 var Client = function (stream, write) {
   this.stream = stream;
@@ -61,8 +54,8 @@ Client.prototype = {
       delete me.pass;
       this.send({op: 'meta', sr: '@danopia.net', ex: me});
       
-      //this.write({op: 'meta', sr: this.acct.user, ex={...} # includes own metadata, like favorite topics and fullname
-      this.send({op: 'meta', sr: '@danopia.net', tp: 'DEADBEEF', ex: {name: 'programming', description: 'Programming talk | RCMP post-commit-hook: http://rcmp.tenthbit.net/ | Get permission before sharing logs, or any paraphrasing thereof, from here.', users: clients.filter(function(c){return c.acct}).map(function(c){return c.acct.user})}});
+      //this.write({op: 'meta', sr: this.acct.user, ex={...} # includes own metadata, like favorite rooms and fullname
+      this.send({op: 'meta', sr: '@danopia.net', rm: '48557f95', ex: {name: 'programming', description: 'Programming talk | RCMP post-commit-hook: http://rcmp.tenthbit.net/ | Get permission before sharing logs, or any paraphrasing thereof, from here.', users: clients.filter(function(c){return c.acct}).map(function(c){return c.acct.user})}});
     } else {
       this.send({op: 'error'});
     };
@@ -70,7 +63,7 @@ Client.prototype = {
   
   actOp: function (pkt, ex) {
     if (!this.acct) return;
-    var newPkt = {op: 'act', tp: pkt.tp, sr: this.acct.user, ex: ex};
+    var newPkt = {op: 'act', rm: pkt.rm, sr: this.acct.user, ex: ex};
     
     clients.forEach(function (client) {
       if (!client.acct) return;
