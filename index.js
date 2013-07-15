@@ -64,12 +64,17 @@ Client.prototype = {
   actOp: function (pkt, ex) {
     if (!this.acct) return;
     var newPkt = {op: 'act', rm: pkt.rm, sr: this.acct.user, ex: ex};
+    delete newPkt.ex.isack;
     
+    var self = this;
     clients.forEach(function (client) {
-      if (!client.acct) return;
+      if (!client.acct || client == self) return;
       
       client.send(newPkt);
     });
+    
+    newPkt.ex.isack = true;
+    this.send(newPkt);
   }
 };
 
