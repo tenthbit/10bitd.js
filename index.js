@@ -21,7 +21,8 @@ var Client = function (stream, write) {
   
   var self = this;
   this.readHandler = function (data) {
-    console.log(data);
+    console.log((self.acct ? self.acct : 'anon'), '>>>', data);
+    
     var pkt = JSON.parse(data);
     if (self[pkt.op+'Op'])
       self[pkt.op+'Op'](pkt, pkt.ex);
@@ -31,8 +32,13 @@ var Client = function (stream, write) {
 };
 
 Client.prototype = {
+  send: function (pkt) {
+    console.log((this.acct ? this.acct.user : 'anon'), '<<<', JSON.stringify(pkt));
+    this.write(JSON.stringify(pkt));
+  },
+  
   sendWelcome: function () {
-    this.write({op: 'welcome', ex: {server: 'danopia.net', software: '10bitd.js/0.0.1', now: +(new Date()), auth: ['password']}});
+    this.send({op: 'welcome', ex: {server: 'danopia.net', software: '10bitd.js/0.0.1', now: +(new Date()), auth: ['password']}});
   },
   
   authOp: function (pkt, ex) {
@@ -44,16 +50,16 @@ Client.prototype = {
     
     if (acct) {
       this.acct = acct;
-      this.write({op: 'ack', ex: {for: 'auth'}});
+      this.send({op: 'ack', ex: {for: 'auth'}});
       
       var me = JSON.parse(JSON.stringify(this.acct));
       delete me.pass;
-      this.write({op: 'meta', sr: '@danopia.net', ex: me});
+      this.send({op: 'meta', sr: '@danopia.net', ex: me});
       
       //this.write({op: 'meta', sr: this.acct.user, ex={...} # includes own metadata, like favorite topics and fullname
-      this.write({op: 'meta', sr: '@danopia.net', tp: 'DEADBEEF', ex: {name: 'programming', description: 'Programming talk | RCMP post-commit-hook: http://rcmp.tenthbit.net/ | Get permission before sharing logs, or any paraphrasing thereof, from here.', users: clients.filter(function(c){return c.acct}).map(function(c){return c.acct.user})}});
+      this.send({op: 'meta', sr: '@danopia.net', tp: 'DEADBEEF', ex: {name: 'programming', description: 'Programming talk | RCMP post-commit-hook: http://rcmp.tenthbit.net/ | Get permission before sharing logs, or any paraphrasing thereof, from here.', users: clients.filter(function(c){return c.acct}).map(function(c){return c.acct.user})}});
     } else {
-      this.write({op: 'error'});
+      this.send({op: 'error'});
     };
   },
   
@@ -64,7 +70,7 @@ Client.prototype = {
     clients.forEach(function (client) {
       if (!client.acct) return;
       
-      client.write(newPkt);
+      client.send(newPkt);
     });
   }
 };
@@ -85,34 +91,38 @@ var options = {
 };
 
 // tcp server
-function rawHandler (stream) {
-  var handler = mainHandler(stream, function (d) { stream.write(JSON.stringify(d) + '\n'); });
+var server = tls.createServer(options, function (stream) {
+  var handler = mainHandler(stream, function (d) { stream.write(d + '\n'); });
   
-  stream.setEncoding('utf8');
-  stream.on('data', handler);
-}
-
-var server = tls.createServer(options, rawHandler);
-server.listen(10817, function () {
+  var buffer = '', idx;
+  stream.on('data', function (data) {
+    buffer += data;
+    
+    while ((idx = buffer.indexOf('\n')) >= 0) {
+      handler(buffer.substring(0, idx));
+      buffer = buffer.substring(idx + 1);
+    }
+  }).setEncoding('utf8');
+}).listen(10817, function () {
   console.log('Listening on port 10817 (tcp)');
 });
 
-// websocket server
-var processRequest = function (req, res) {
+// web server
+var app = https.createServer(options, function (req, res) {
   console.log(req,req.method,req.url);
   res.writeHead(200);
   res.end("All glory to WebSockets!\n");
-};
-
-var app = https.createServer(options, processRequest);
-    
-app.listen(10818, function () {
+}).listen(10818, function () {
   console.log('Listening on port 10818 (web)');
 });
 
+// websocket server
 var wss = new (require('ws').Server)({server: app});
 wss.on('connection', function (wsc) {
-  var handler = mainHandler(wsc._socket, function (d) {console.log(d); wsc.send(JSON.stringify(d)); });
+  if (!wsc._socket.npnProtocol)
+    wsc._socket.npnProtocol = 'http/1.1';
+  
+  var handler = mainHandler(wsc._socket, function (d) { wsc.send(d); });
   wsc.on('message', handler);
 });
 
