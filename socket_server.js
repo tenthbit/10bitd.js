@@ -7,13 +7,13 @@ var tls   = require('tls'),
 exports.options = {
   key: fs.readFileSync('server-key.pem'),
   cert: fs.readFileSync('server-cert.pem'),
-  NPNProtocols: ['10bit/0.1', '10bit-gzip/0.1', 'http/1.1']
+  NPNProtocols: ['10bit', '10bit-gzip', 'http/1.1']
 };
 
 // tcp server
 exports.tcp = tls.createServer(exports.options, function (stream) {
   if (!stream.npnProtocol)
-    stream.npnProtocol = '10bit/0.1';
+    stream.npnProtocol = '10bit';
     
   var handler = exports.handler(stream, function (d) { stream.write(d + '\n'); });
   
