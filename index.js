@@ -14,7 +14,7 @@ var Client = function (stream, write) {
   
   var self = this;
   this.readHandler = function (data) {
-    console.log((self.acct ? self.acct : 'anon'), '>>>', data);
+    console.log((self.acct ? self.acct.user : 'anon'), '>>>', data);
     
     var pkt = JSON.parse(data);
     if (self[pkt.op+'Op'])
