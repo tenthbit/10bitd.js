@@ -63,7 +63,7 @@ Client.prototype = {
   
   actOp: function (pkt, ex) {
     if (!this.acct) return;
-    var newPkt = {op: 'act', rm: pkt.rm, sr: this.acct.user, ex: ex};
+    var newPkt = {op: 'act', rm: pkt.rm, sr: this.acct.user, ex: ex ? ex : {}};
     delete newPkt.ex.isack;
     
     var self = this;
@@ -75,6 +75,23 @@ Client.prototype = {
     
     newPkt.ex.isack = true;
     this.send(newPkt);
+  },
+  
+  leaveOp: function (pkt, ex) {
+    if (!this.acct) { return this.stream.end(); }
+    
+    var newPkt = {op: 'leave', sr: this.acct.user, ex: ex ? ex : {}};
+    delete newPkt.ex.isack;
+    
+    var self = this;
+    clients.forEach(function (client) {
+      if (!client.acct || client == self) return;
+      
+      client.send(newPkt);
+    });
+    
+    newPkt.ex.isack = true;
+    this.stream.end();
   }
 };
 
