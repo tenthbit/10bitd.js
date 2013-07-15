@@ -29,6 +29,11 @@ var Client = function (stream, write) {
     else
       console.log('unhandled op', pkt.op, 'in', pkt);
   };
+  
+  stream.on('end', function () {
+    console.log('bye');
+    clients.splice(clients.indexOf(self, 1));
+  });
 };
 
 Client.prototype = {
