@@ -4,6 +4,14 @@ var https = require('https');
 
 var accts = JSON.parse(fs.readFileSync('accounts.json'));
 var clients = [];
+var topics = [];
+
+topics.push({
+  id: 'DEADBEEF',
+  name: 'Programming',
+  format: 'markdown',
+  acl: [['dan', ['owner']], ['Squidward', ['ban']]],
+  description: '## Programming talk\n* RCMP post-commit-hook: http://rcmp.tenthbit.net/\n* Get permission before sharing logs, or any paraphrasing thereof, from here.'});
 
 var Client = function (stream, write) {
   this.stream = stream;
@@ -38,7 +46,10 @@ Client.prototype = {
       this.acct = acct;
       this.write({op: 'ack', ex: {for: 'auth'}});
       
-      //this.write({op: 'meta', sr: '@danopia.net', ex={...} # includes server metadata, like rules
+      var me = JSON.parse(JSON.stringify(this.acct));
+      delete me.pass;
+      this.write({op: 'meta', sr: '@danopia.net', ex: me});
+      
       //this.write({op: 'meta', sr: this.acct.user, ex={...} # includes own metadata, like favorite topics and fullname
       this.write({op: 'meta', sr: '@danopia.net', tp: 'DEADBEEF', ex: {name: 'programming', description: 'Programming talk | RCMP post-commit-hook: http://rcmp.tenthbit.net/ | Get permission before sharing logs, or any paraphrasing thereof, from here.', users: clients.filter(function(c){return c.acct}).map(function(c){return c.acct.user})}});
     } else {
@@ -81,7 +92,7 @@ var options = {
 };
 var server = tls.createServer(options, rawHandler);
 server.listen(10817, function () {
-  console.log('Listening on port 10817');
+  console.log('Listening on port 10817 (tcp)');
 });
 
 // websocket server
@@ -94,10 +105,11 @@ var processRequest = function( req, res ) {
 var app = https.createServer({
   key: fs.readFileSync('server-key.pem'),
   cert: fs.readFileSync('server-cert.pem'),
+  NPNProtocols: ['http/1.1']
 }, processRequest);
     
 app.listen(10818, function () {
-  console.log('Listening on port 10818');
+  console.log('Listening on port 10818 (ws)');
 });
 
 var wss = new (require('ws').Server)({server: app});
