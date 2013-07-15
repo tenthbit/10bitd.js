@@ -92,6 +92,9 @@ var options = {
 
 // tcp server
 var server = tls.createServer(options, function (stream) {
+  if (!wsc._socket.npnProtocol)
+    wsc._socket.npnProtocol = '10bit/0.1';
+    
   var handler = mainHandler(stream, function (d) { stream.write(d + '\n'); });
   
   var buffer = '', idx;
