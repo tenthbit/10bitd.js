@@ -1,6 +1,6 @@
-var tls = require('tls');
-var fs  = require('fs');
-var https = require('https');
+var fs = require('fs');
+
+var socketServer = require('./socket_server');
 
 var accts = JSON.parse(fs.readFileSync('accounts.json'));
 var clients = [];
@@ -80,57 +80,13 @@ Client.prototype = {
   }
 };
 
-function mainHandler (stream, write) {
+socketServer.handler = function (stream, write) {
   console.log('client connected', stream.npnProtocol, stream.authorized, stream.remoteAddress);
 
   var client = new Client(stream, write);
   clients.push(client);
   return client.readHandler;
-}
-
-// ssl/tls
-var options = {
-  key: fs.readFileSync('server-key.pem'),
-  cert: fs.readFileSync('server-cert.pem'),
-  NPNProtocols: ['10bit/0.1', '10bit-gzip/0.1', 'http/1.1']
 };
 
-// tcp server
-var server = tls.createServer(options, function (stream) {
-  if (!wsc._socket.npnProtocol)
-    wsc._socket.npnProtocol = '10bit/0.1';
-    
-  var handler = mainHandler(stream, function (d) { stream.write(d + '\n'); });
-  
-  var buffer = '', idx;
-  stream.on('data', function (data) {
-    buffer += data;
-    
-    while ((idx = buffer.indexOf('\n')) >= 0) {
-      handler(buffer.substring(0, idx));
-      buffer = buffer.substring(idx + 1);
-    }
-  }).setEncoding('utf8');
-}).listen(10817, function () {
-  console.log('Listening on port 10817 (tcp)');
-});
-
-// web server
-var app = https.createServer(options, function (req, res) {
-  console.log(req,req.method,req.url);
-  res.writeHead(200);
-  res.end("All glory to WebSockets!\n");
-}).listen(10818, function () {
-  console.log('Listening on port 10818 (web)');
-});
-
-// websocket server
-var wss = new (require('ws').Server)({server: app});
-wss.on('connection', function (wsc) {
-  if (!wsc._socket.npnProtocol)
-    wsc._socket.npnProtocol = 'http/1.1';
-  
-  var handler = mainHandler(wsc._socket, function (d) { wsc.send(d); });
-  wsc.on('message', handler);
-});
+socketServer.listen();
 
