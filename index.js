@@ -117,7 +117,7 @@ Client.prototype = {
     
     this.send({op: 'meta', sr: '@danopia.net', rm: id, ex: room});
     
-    var pkt = {op: 'join', sr: this.acct.user, ex: ex};
+    var pkt = {op: 'join', sr: this.acct.user, ex: ex, rm: id};
     relayPkt(pkt, this, [id]);
   },
   
