@@ -141,7 +141,7 @@ Client.prototype = {
     room.users.splice(room.users.indexOf(this.acct.user), 1);
     data.subs[id].splice(data.subs[id].indexOf(this), 1);
     
-    var pkt = {op: 'leave', sr: this.acct.user, ex: ex};
+    var pkt = {op: 'leave', sr: this.acct.user, ex: ex, rm: id};
     relayPkt(pkt, this, [id]);
   },
   
