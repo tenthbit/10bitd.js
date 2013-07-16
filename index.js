@@ -1,25 +1,7 @@
-var fs = require('fs');
-
 var socketServer = require('./socket_server');
+var data = require('./data');
 
-var accts = JSON.parse(fs.readFileSync('accounts.json'));
-var rooms = JSON.parse(fs.readFileSync('rooms.json'));
-var subs = {};
 var clients = [];
-
-function findRoom (id) {
-  for (var idx in rooms) {
-    var room = rooms[idx];
-    if (room.id == id) {
-      if (!room.users) room.users = [];
-      if (!subs[room.id]) subs[room.id] = [];
-      
-      return room;
-    };
-  };
-  
-  return null;
-}
 
 var seq = 1;
 function nextId () {
@@ -57,10 +39,10 @@ function relayPkt (pkt, ackTo, rooms, noRoom) {
   
   var sent = [];
   (rooms || []).forEach(function (id) {
-    var room = findRoom(id);
+    var room = data.findRoom(id);
     if (!room) return;
     
-    subs[id].forEach(function (client) {
+    data.subs[id].forEach(function (client) {
       if (client == ackTo || sent.indexOf(client) >= 0) return;
       
       if (!noRoom) pkt.rm = id;
@@ -103,8 +85,8 @@ Client.prototype = {
       
       var self = this;
       mySubs.forEach(function (id) {
-        findRoom(id).users.splice(findRoom(id).users.indexOf(self.acct.user), 1);
-        subs[id].splice(subs[id].indexOf(self), 1);
+        data.findRoom(id).users.splice(data.findRoom(id).users.indexOf(self.acct.user), 1);
+        data.subs[id].splice(data.subs[id].indexOf(self), 1);
       });
       
       var pkt = {op: 'leave', sr: this.acct.user};
@@ -118,8 +100,8 @@ Client.prototype = {
   
   findSubs: function () {
     var ids = [];
-    for (id in subs) {
-      if (subs[id].indexOf(this) >= 0)
+    for (id in data.subs) {
+      if (data.subs[id].indexOf(this) >= 0)
         ids.push(id);
     };
     
@@ -127,11 +109,11 @@ Client.prototype = {
   },
   
   joinRoom: function (id, ex, auto) {
-    var room = findRoom(id);
+    var room = data.findRoom(id);
     if (!this.acct || !id || !room) return false;
-    if (subs[id].indexOf(this) >= 0) return false;
+    if (data.subs[id].indexOf(this) >= 0) return false;
     room.users.push(this.acct.user);
-    subs[id].push(this);
+    data.subs[id].push(this);
     
     this.send({op: 'meta', sr: '@danopia.net', rm: id, ex: room});
     
@@ -140,11 +122,11 @@ Client.prototype = {
   },
   
   leaveRoom: function (id, ex) {
-    if (!this.acct || !id || !findRoom(id)) return false;
-    var room = findRoom(id);
-    if (subs[id].indexOf(this) == -1) return false;
+    if (!this.acct || !id || !data.findRoom(id)) return false;
+    var room = data.findRoom(id);
+    if (data.subs[id].indexOf(this) == -1) return false;
     room.users.splice(room.users.indexOf(this.acct.user), 1);
-    subs[id].splice(subs[id].indexOf(this), 1);
+    data.subs[id].splice(data.subs[id].indexOf(this), 1);
     
     var pkt = {op: 'leave', sr: this.acct.user, ex: ex};
     relayPkt(pkt, this, [id]);
@@ -154,7 +136,7 @@ Client.prototype = {
   
   authOp: function (pkt, ex) {
     var acct;
-    accts.forEach(function (that) {
+    data.accts.forEach(function (that) {
       if (that.user == ex.username && that.pass == ex.password)
         acct = that;
     });
@@ -178,7 +160,7 @@ Client.prototype = {
   },
   
   actOp: function (pkt, ex) {
-    if (!this.acct || !pkt.rm || !findRoom(pkt.rm) || subs[pkt.rm].indexOf(this) == -1) return;
+    if (!this.acct || !pkt.rm || !data.findRoom(pkt.rm) || data.subs[pkt.rm].indexOf(this) == -1) return;
     
     var newPkt = {op: 'act', rm: pkt.rm, sr: this.acct.user, ex: ex ? ex : {}};
     relayPkt(newPkt, this, [pkt.rm]);
