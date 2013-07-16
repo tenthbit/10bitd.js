@@ -49,9 +49,10 @@ var Client = function (stream, write) {
 };
 
 function relayPkt (pkt, ackTo, rooms, noRoom) {
-  delete pkt.ex.isack;
   if (!pkt.ts) pkt.ts = +(new Date());
   if (!pkt.id) pkt.id = nextId();
+  if (!pkt.ex) pkt.ex = {};
+  delete pkt.ex.isack;
   
   var sent = [];
   (rooms || []).forEach(function (id) {
@@ -112,7 +113,7 @@ Client.prototype = {
   },
   
   actOp: function (pkt, ex) {
-    if (!this.acct || !pkt.rm || !findRoom(pkt.rm) || findRoom(pkt.rm).clients.indexOf(this) == -1) return;
+    if (!this.acct || !pkt.rm || !findRoom(pkt.rm) || subs[pkt.rm].indexOf(this) == -1) return;
     
     var newPkt = {op: 'act', rm: pkt.rm, sr: this.acct.user, ex: ex ? ex : {}};
     relayPkt(newPkt, this, [pkt.rm]);
@@ -135,6 +136,29 @@ Client.prototype = {
     
     console.log('disconnecting ' + (this.acct ? this.acct.user : 'anon'));
     clients.splice(idx, 1);
+    
+    if (this.acct) {
+      var mySubs = this.findSubs();
+      
+      var self = this;
+      mySubs.forEach(function (id) {
+        findRoom(id).users.splice(findRoom(id).users.indexOf(self.acct.name), 1);
+        subs[id].splice(subs[id].indexOf(self), 1);
+      });
+      
+      var pkt = {op: 'leave', sr: this.acct.name};
+      relayPkt(pkt, null, mySubs, true);
+    };
+  },
+  
+  findSubs: function () {
+    var ids = [];
+    for (id in subs) {
+      if (subs[id].indexOf(this) >= 0)
+        ids.push(id);
+    };
+    
+    return ids;
   },
   
   joinRoom: function (id, ex) {
@@ -144,7 +168,7 @@ Client.prototype = {
     room.users.push(this.acct.name);
     subs[id].push(this);
     
-    var pkt = {op: 'join', sr: this.acct.name, ex: (ex || {})};
+    var pkt = {op: 'join', sr: this.acct.name, ex: ex};
     relayPkt(pkt, this, [id]);
     
     this.send({op: 'meta', sr: '@danopia.net', rm: id, ex: room});
@@ -157,7 +181,7 @@ Client.prototype = {
     room.users.splice(room.users.indexOf(this.acct.name), 1);
     subs[id].splice(subs[id].indexOf(this), 1);
     
-    var pkt = {op: 'leave', sr: this.acct.name, ex: (ex || {})};
+    var pkt = {op: 'leave', sr: this.acct.name, ex: ex};
     relayPkt(pkt, this, [id]);
   },
   
