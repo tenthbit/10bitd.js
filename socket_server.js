@@ -15,6 +15,10 @@ exports.tcp = tls.createServer(exports.options, function (stream) {
   if (!stream.npnProtocol)
     stream.npnProtocol = '10bit';
     
+  stream.on('error', function (ex, securePair) {
+    console.log('TLS socket error occured:', ex.message);
+  });
+    
   var handler = exports.handler(stream, function (d) { stream.write(d + '\n'); });
   
   var buffer = '', idx;
@@ -54,4 +58,13 @@ exports.listen = function () {
     console.log('Listening on port 10818 (web)');
   });
 };
+
+// error handling
+exports.tcp.on('clientError', function (ex, securePair) {
+  console.log('Client error occured during SSL negotiation:', ex.message);
+});
+
+exports.web.on('clientError', function (ex, socket) {
+  console.log('Client error occured in HTTP server:', ex.message);
+});
 
