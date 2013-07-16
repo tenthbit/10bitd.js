@@ -44,6 +44,7 @@ var Client = function (stream, write) {
   };
   
   stream.on('end', function () {
+    self.dead = true;
     self.disconnect();
   });
 };
@@ -105,7 +106,7 @@ Client.prototype = {
       var self = this;
       (acct.rooms || []).forEach(function (fav) {
         if (fav.auto)
-          self.joinRoom(fav.id);
+          self.joinRoom(fav.id, null, true);
       });
     } else {
       this.send({op: 'error'});
@@ -142,13 +143,15 @@ Client.prototype = {
       
       var self = this;
       mySubs.forEach(function (id) {
-        findRoom(id).users.splice(findRoom(id).users.indexOf(self.acct.name), 1);
+        findRoom(id).users.splice(findRoom(id).users.indexOf(self.acct.user), 1);
         subs[id].splice(subs[id].indexOf(self), 1);
       });
       
-      var pkt = {op: 'leave', sr: this.acct.name};
-      relayPkt(pkt, null, mySubs, true);
+      var pkt = {op: 'leave', sr: this.acct.user};
+      relayPkt(pkt, this.dead ? null : this, mySubs, true);
     };
+    
+    this.dead = true;
   },
   
   findSubs: function () {
@@ -161,15 +164,16 @@ Client.prototype = {
     return ids;
   },
   
-  joinRoom: function (id, ex) {
-    if (!this.acct || !id || !findRoom(id)) return false;
+  joinRoom: function (id, ex, auto) {
     var room = findRoom(id);
+    if (!this.acct || !id || !room) return false;
     if (subs[id].indexOf(this) >= 0) return false;
-    room.users.push(this.acct.name);
+    room.users.push(this.acct.user);
     subs[id].push(this);
     
-    var pkt = {op: 'join', sr: this.acct.name, ex: ex};
-    relayPkt(pkt, this, [id]);
+    var pkt = {op: 'join', sr: this.acct.user, ex: ex};
+    console.log(pkt);
+    relayPkt(pkt, auto ? null : this, [id]);
     
     this.send({op: 'meta', sr: '@danopia.net', rm: id, ex: room});
   },
@@ -178,10 +182,10 @@ Client.prototype = {
     if (!this.acct || !id || !findRoom(id)) return false;
     var room = findRoom(id);
     if (subs[id].indexOf(this) == -1) return false;
-    room.users.splice(room.users.indexOf(this.acct.name), 1);
+    room.users.splice(room.users.indexOf(this.acct.user), 1);
     subs[id].splice(subs[id].indexOf(this), 1);
     
-    var pkt = {op: 'leave', sr: this.acct.name, ex: ex};
+    var pkt = {op: 'leave', sr: this.acct.user, ex: ex};
     relayPkt(pkt, this, [id]);
   },
   
