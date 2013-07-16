@@ -4,7 +4,27 @@ var socketServer = require('./socket_server');
 
 var accts = JSON.parse(fs.readFileSync('accounts.json'));
 var rooms = JSON.parse(fs.readFileSync('rooms.json'));
+var subs = {};
 var clients = [];
+
+function findRoom (id) {
+  for (var idx in rooms) {
+    var room = rooms[idx];
+    if (room.id == id) {
+      if (!room.users) room.users = [];
+      if (!subs[room.id]) subs[room.id] = [];
+      
+      return room;
+    };
+  };
+  
+  return null;
+}
+
+var seq = 1;
+function nextId () {
+  return '1-'+(seq++);
+}
 
 var Client = function (stream, write) {
   this.stream = stream;
@@ -24,19 +44,46 @@ var Client = function (stream, write) {
   };
   
   stream.on('end', function () {
-    console.log('bye');
-    clients.splice(clients.indexOf(self, 1));
+    self.disconnect();
   });
+};
+
+function relayPkt (pkt, ackTo, rooms, noRoom) {
+  delete pkt.ex.isack;
+  if (!pkt.ts) pkt.ts = +(new Date());
+  if (!pkt.id) pkt.id = nextId();
+  
+  var sent = [];
+  (rooms || []).forEach(function (id) {
+    var room = findRoom(id);
+    if (!room) return;
+    
+    subs[id].forEach(function (client) {
+      if (client == ackTo || sent.indexOf(client) >= 0) return;
+      
+      if (!noRoom) pkt.rm = id;
+      client.send(pkt);
+      sent.push(client);
+    });
+  });
+  
+  if (ackTo) {
+    pkt.ex.isack = true;
+    ackTo.send(pkt);
+  };
 };
 
 Client.prototype = {
   send: function (pkt) {
+    if (!pkt.ts) pkt.ts = +(new Date());
+    if (!pkt.id) pkt.id = nextId();
+    
     console.log((this.acct ? this.acct.user : 'anon'), '<<<', JSON.stringify(pkt));
     this.write(JSON.stringify(pkt));
   },
   
   sendWelcome: function () {
-    this.send({op: 'welcome', ex: {server: 'danopia.net', software: '10bitd.js/0.0.1', now: +(new Date()), auth: ['password']}});
+    this.send({op: 'welcome', ex: {server: 'danopia.net', software: '10bitd.js/0.0.1', auth: ['password']}});
   },
   
   authOp: function (pkt, ex) {
@@ -48,50 +95,74 @@ Client.prototype = {
     
     if (acct) {
       this.acct = acct;
-      this.send({op: 'ack', ex: {for: 'auth'}});
+      relayPkt(pkt, this);
       
       var me = JSON.parse(JSON.stringify(this.acct));
       delete me.pass;
       this.send({op: 'meta', sr: '@danopia.net', ex: me});
       
-      //this.write({op: 'meta', sr: this.acct.user, ex={...} # includes own metadata, like favorite rooms and fullname
-      this.send({op: 'meta', sr: '@danopia.net', rm: '48557f95', ex: {name: 'programming', description: 'Programming talk | RCMP post-commit-hook: http://rcmp.tenthbit.net/ | Get permission before sharing logs, or any paraphrasing thereof, from here.', users: clients.filter(function(c){return c.acct}).map(function(c){return c.acct.user})}});
+      var self = this;
+      (acct.rooms || []).forEach(function (fav) {
+        if (fav.auto)
+          self.joinRoom(fav.id);
+      });
     } else {
       this.send({op: 'error'});
     };
   },
   
   actOp: function (pkt, ex) {
-    if (!this.acct) return;
+    if (!this.acct || !pkt.rm || !findRoom(pkt.rm) || findRoom(pkt.rm).clients.indexOf(this) == -1) return;
+    
     var newPkt = {op: 'act', rm: pkt.rm, sr: this.acct.user, ex: ex ? ex : {}};
-    delete newPkt.ex.isack;
-    
-    var self = this;
-    clients.forEach(function (client) {
-      if (!client.acct || client == self) return;
-      
-      client.send(newPkt);
-    });
-    
-    newPkt.ex.isack = true;
-    this.send(newPkt);
+    relayPkt(newPkt, this, [pkt.rm]);
   },
   
   leaveOp: function (pkt, ex) {
     if (!this.acct) { return this.stream.end(); }
     
-    var newPkt = {op: 'leave', sr: this.acct.user, ex: ex ? ex : {}};
-    delete newPkt.ex.isack;
+    if (pkt.rm) {
+      this.leaveRoom(pkt.rm, ex);
+    } else {
+      this.disconnect();
+      this.stream.end();
+    }
+  },
+  
+  disconnect: function (ex) {
+    var idx = clients.indexOf(this);
+    if (idx == -1) return false;
     
-    var self = this;
-    clients.forEach(function (client) {
-      if (!client.acct || client == self) return;
-      
-      client.send(newPkt);
-    });
+    console.log('disconnecting ' + (this.acct ? this.acct.user : 'anon'));
+    clients.splice(idx, 1);
+  },
+  
+  joinRoom: function (id, ex) {
+    if (!this.acct || !id || !findRoom(id)) return false;
+    var room = findRoom(id);
+    if (subs[id].indexOf(this) >= 0) return false;
+    room.users.push(this.acct.name);
+    subs[id].push(this);
     
-    newPkt.ex.isack = true;
-    this.stream.end();
+    var pkt = {op: 'join', sr: this.acct.name, ex: (ex || {})};
+    relayPkt(pkt, this, [id]);
+    
+    this.send({op: 'meta', sr: '@danopia.net', rm: id, ex: room});
+  },
+  
+  leaveRoom: function (id, ex) {
+    if (!this.acct || !id || !findRoom(id)) return false;
+    var room = findRoom(id);
+    if (subs[id].indexOf(this) == -1) return false;
+    room.users.splice(room.users.indexOf(this.acct.name), 1);
+    subs[id].splice(subs[id].indexOf(this), 1);
+    
+    var pkt = {op: 'leave', sr: this.acct.name, ex: (ex || {})};
+    relayPkt(pkt, this, [id]);
+  },
+  
+  joinOp: function (pkt, ex) {
+    this.joinRoom(pkt.rm, ex);
   }
 };
 
