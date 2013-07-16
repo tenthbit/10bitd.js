@@ -76,6 +76,9 @@ function relayPkt (pkt, ackTo, rooms, noRoom) {
 };
 
 Client.prototype = {
+
+  // Socket helpers  
+  
   send: function (pkt) {
     if (!pkt.ts) pkt.ts = +(new Date());
     if (!pkt.id) pkt.id = nextId();
@@ -86,49 +89,6 @@ Client.prototype = {
   
   sendWelcome: function () {
     this.send({op: 'welcome', ex: {server: 'danopia.net', software: '10bitd.js/0.0.1', auth: ['password']}});
-  },
-  
-  authOp: function (pkt, ex) {
-    var acct;
-    accts.forEach(function (that) {
-      if (that.user == ex.username && that.pass == ex.password)
-        acct = that;
-    });
-    
-    if (acct) {
-      this.acct = acct;
-      relayPkt(pkt, this);
-      
-      var me = JSON.parse(JSON.stringify(this.acct));
-      delete me.pass;
-      this.send({op: 'meta', sr: '@danopia.net', ex: me});
-      
-      var self = this;
-      (acct.rooms || []).forEach(function (fav) {
-        if (fav.auto)
-          self.joinRoom(fav.id, null, true);
-      });
-    } else {
-      this.send({op: 'error'});
-    };
-  },
-  
-  actOp: function (pkt, ex) {
-    if (!this.acct || !pkt.rm || !findRoom(pkt.rm) || subs[pkt.rm].indexOf(this) == -1) return;
-    
-    var newPkt = {op: 'act', rm: pkt.rm, sr: this.acct.user, ex: ex ? ex : {}};
-    relayPkt(newPkt, this, [pkt.rm]);
-  },
-  
-  leaveOp: function (pkt, ex) {
-    if (!this.acct) { return this.stream.end(); }
-    
-    if (pkt.rm) {
-      this.leaveRoom(pkt.rm, ex);
-    } else {
-      this.disconnect();
-      this.stream.end();
-    }
   },
   
   disconnect: function (ex) {
@@ -153,6 +113,8 @@ Client.prototype = {
     
     this.dead = true;
   },
+  
+  // Room helpers
   
   findSubs: function () {
     var ids = [];
@@ -188,8 +150,53 @@ Client.prototype = {
     relayPkt(pkt, this, [id]);
   },
   
+  // Operation handlers
+  
+  authOp: function (pkt, ex) {
+    var acct;
+    accts.forEach(function (that) {
+      if (that.user == ex.username && that.pass == ex.password)
+        acct = that;
+    });
+    
+    if (acct) {
+      this.acct = acct;
+      relayPkt(pkt, this);
+      
+      var me = JSON.parse(JSON.stringify(this.acct));
+      delete me.pass;
+      this.send({op: 'meta', sr: '@danopia.net', ex: me});
+      
+      var self = this;
+      (acct.rooms || []).forEach(function (fav) {
+        if (fav.auto)
+          self.joinRoom(fav.id, null, true);
+      });
+    } else {
+      this.send({op: 'error'});
+    };
+  },
+  
+  actOp: function (pkt, ex) {
+    if (!this.acct || !pkt.rm || !findRoom(pkt.rm) || subs[pkt.rm].indexOf(this) == -1) return;
+    
+    var newPkt = {op: 'act', rm: pkt.rm, sr: this.acct.user, ex: ex ? ex : {}};
+    relayPkt(newPkt, this, [pkt.rm]);
+  },
+  
   joinOp: function (pkt, ex) {
     this.joinRoom(pkt.rm, ex);
+  },
+  
+  leaveOp: function (pkt, ex) {
+    if (!this.acct) { return this.stream.end(); }
+    
+    if (pkt.rm) {
+      this.leaveRoom(pkt.rm, ex);
+    } else {
+      this.disconnect();
+      this.stream.end();
+    }
   }
 };
 
