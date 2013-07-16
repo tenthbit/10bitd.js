@@ -16,7 +16,7 @@ var Client = function (stream, write) {
   
   var self = this;
   this.readHandler = function (data) {
-    console.log((self.acct ? self.acct.user : 'anon'), '>>>', data);
+    console.log(self.getLabel(), '>>>', data);
     
     var d = require('domain').create(), pkt;
     d.on('error', function (er) {
@@ -27,8 +27,8 @@ var Client = function (stream, write) {
     
     if (!pkt) return;
     
-    if (self[pkt.op+'Op'])
-      self[pkt.op+'Op'](pkt, pkt.ex);
+    if (self[pkt.op + 'Op'])
+      self[pkt.op + 'Op'](pkt, pkt.ex);
     else
       console.log('unhandled op', pkt.op, 'in', pkt);
   };
@@ -77,7 +77,7 @@ Client.prototype = {
     if (!pkt.ts) pkt.ts = +(new Date());
     if (!pkt.id) pkt.id = nextId();
     
-    console.log((this.acct ? this.acct.user : 'anon'), '<<<', JSON.stringify(pkt));
+    console.log(this.getLabel(), '<<<', JSON.stringify(pkt));
     this.write(JSON.stringify(pkt));
   },
   
@@ -89,7 +89,7 @@ Client.prototype = {
     var idx = clients.indexOf(this);
     if (idx == -1) return false;
     
-    console.log('disconnecting ' + (this.acct ? this.acct.user : 'anon'));
+    console.log('disconnecting ' + this.getLabel());
     clients.splice(idx, 1);
     
     if (this.acct) {
@@ -106,6 +106,10 @@ Client.prototype = {
     };
     
     this.dead = true;
+  },
+  
+  getLabel: function () {
+    return self.acct ? self.acct.user : this.stream.remoteAddress;
   },
   
   // Room helpers
@@ -177,7 +181,7 @@ Client.prototype = {
   actOp: function (pkt, ex) {
     if (!this.acct || !pkt.rm || !data.findRoom(pkt.rm) || data.subs[pkt.rm].indexOf(this) == -1) return;
     
-    var newPkt = {op: 'act', rm: pkt.rm, sr: this.acct.user, ex: ex ? ex : {}};
+    var newPkt = {op: 'act', rm: pkt.rm, sr: this.acct.user, ex: ex};
     relayPkt(newPkt, this, [pkt.rm]);
   },
   
