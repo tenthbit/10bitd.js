@@ -171,11 +171,10 @@ Client.prototype = {
     room.users.push(this.acct.user);
     subs[id].push(this);
     
-    var pkt = {op: 'join', sr: this.acct.user, ex: ex};
-    console.log(pkt);
-    relayPkt(pkt, auto ? null : this, [id]);
-    
     this.send({op: 'meta', sr: '@danopia.net', rm: id, ex: room});
+    
+    var pkt = {op: 'join', sr: this.acct.user, ex: ex};
+    relayPkt(pkt, auto ? null : this, [id]);
   },
   
   leaveRoom: function (id, ex) {
