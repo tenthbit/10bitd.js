@@ -101,7 +101,7 @@ Client.prototype = {
         data.subs[id].splice(data.subs[id].indexOf(self), 1);
       });
       
-      var pkt = {op: 'leave', sr: this.acct.user};
+      var pkt = {op: 'disconnect', sr: this.acct.user};
       relayPkt(pkt, this.dead ? null : this, mySubs, true);
     };
     
@@ -190,14 +190,13 @@ Client.prototype = {
   },
   
   leaveOp: function (pkt, ex) {
-    if (!this.acct) { return this.stream.end(); }
-    
-    if (pkt.rm) {
-      this.leaveRoom(pkt.rm, ex);
-    } else {
-      this.disconnect();
-      this.stream.end();
-    }
+    if (!this.acct || !pkt.rm) return false;
+    this.leaveRoom(pkt.rm, ex);
+  },
+  
+  disconnectOp: function (pkt, ex) {
+    this.disconnect();
+    this.stream.end();
   }
 };
 
