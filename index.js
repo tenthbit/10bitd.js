@@ -35,7 +35,11 @@ var Client = function (stream, write) {
   
   stream.on('end', function () {
     self.dead = true;
-    self.disconnect();
+    self.disconnect({reason: 'connection closed'});
+  }).on('error', function (ex) {
+    console.log('Socket error:', ex.message);
+    self.dead = true;
+    self.disconnect({reason: 'socket error'});
   });
 };
 

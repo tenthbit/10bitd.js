@@ -15,10 +15,6 @@ exports.tcp = tls.createServer(exports.options, function (stream) {
   if (!stream.npnProtocol)
     stream.npnProtocol = '10bit';
     
-  stream.on('error', function (ex, securePair) {
-    console.log('TLS socket error occured:', ex.message);
-  });
-    
   var handler = exports.handler(stream, function (d) { stream.write(d + '\n'); });
   
   var buffer = '', idx;
