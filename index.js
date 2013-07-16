@@ -109,7 +109,7 @@ Client.prototype = {
   },
   
   getLabel: function () {
-    return self.acct ? self.acct.user : this.stream.remoteAddress;
+    return this.acct ? this.acct.user : this.stream.remoteAddress;
   },
   
   // Room helpers
