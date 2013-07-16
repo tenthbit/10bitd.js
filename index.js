@@ -124,10 +124,11 @@ Client.prototype = {
     var room = data.findRoom(id);
     if (!this.acct || !id || !room) return false;
     if (data.subs[id].indexOf(this) >= 0) return false;
-    room.users.push(this.acct.user);
-    data.subs[id].push(this);
     
     this.send({op: 'meta', sr: '@danopia.net', rm: id, ex: room});
+    
+    room.users.push(this.acct.user);
+    data.subs[id].push(this);
     
     var pkt = {op: 'join', sr: this.acct.user, ex: ex, rm: id};
     relayPkt(pkt, this, [id]);
