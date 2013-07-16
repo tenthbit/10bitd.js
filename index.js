@@ -163,7 +163,7 @@ Client.prototype = {
           self.joinRoom(fav.id, null, true);
       });
     } else {
-      this.send({op: 'error'});
+      this.send({op: 'error', ex: {message: 'Authentication failed for ' + ex.username}});
     };
   },
   
