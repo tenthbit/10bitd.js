@@ -18,7 +18,15 @@ var Client = function (stream, write) {
   this.readHandler = function (data) {
     console.log((self.acct ? self.acct.user : 'anon'), '>>>', data);
     
-    var pkt = JSON.parse(data);
+    var d = require('domain').create(), pkt;
+    d.on('error', function (er) {
+      self.send({op: 'error', ex: {message: "Error while parsing packet", details: er.message}});
+    }).run(function () {
+      pkt = JSON.parse(data);
+    });
+    
+    if (!pkt) return;
+    
     if (self[pkt.op+'Op'])
       self[pkt.op+'Op'](pkt, pkt.ex);
     else
