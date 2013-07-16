@@ -1,7 +1,13 @@
 var fs = require('fs');
 
-exports.accts = JSON.parse(fs.readFileSync('accounts.json'));
+exports.reload = function () {
+  exports.accts = JSON.parse(fs.readFileSync('accounts.json'));
+  console.log('Loaded account data');
+};
+exports.reload();
+
 exports.rooms = JSON.parse(fs.readFileSync('rooms.json'));
+
 exports.subs = {};
 
 exports.findRoom = function (id) {

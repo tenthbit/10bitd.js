@@ -148,6 +148,8 @@ Client.prototype = {
   // Operation handlers
   
   authOp: function (pkt, ex) {
+    data.reload();
+    
     var acct;
     data.accts.forEach(function (that) {
       if (that.user == ex.username && that.pass == ex.password)
