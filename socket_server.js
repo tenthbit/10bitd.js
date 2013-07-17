@@ -41,6 +41,7 @@ exports.wss.on('connection', function (wsc) {
   if (!wsc._socket.npnProtocol)
     wsc._socket.npnProtocol = 'http/1.1';
   
+  wsc._socket.wsc = wsc;
   var handler = exports.handler(wsc._socket, function (d) { wsc.send(d); });
   wsc.on('message', handler);
 });

@@ -78,7 +78,14 @@ Client.prototype = {
     if (!pkt.id) pkt.id = nextId();
     
     console.log(this.getLabel(), '<<<', JSON.stringify(pkt));
-    this.write(JSON.stringify(pkt));
+    
+    if (this.stream.wsc && this.stream.wsc.readyState != 1) {// open
+      console.log('Disconnecting due to websocket state:', this.stream.wsc.readyState);
+      this.dead = true;
+      this.disconnect({reason: 'websocket state was ' + this.stream.wsc.readyState});
+    } else {
+      this.write(JSON.stringify(pkt));
+    };
   },
   
   sendWelcome: function () {
