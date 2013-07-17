@@ -169,7 +169,7 @@ Client.prototype = {
       this.send({op: 'meta', sr: '@danopia.net', ex: me});
       
       var self = this;
-      (acct.rooms || []).forEach(function (fav) {
+      (acct.favs || []).forEach(function (fav) {
         if (fav.auto)
           self.joinRoom(fav.id, null, true);
       });
